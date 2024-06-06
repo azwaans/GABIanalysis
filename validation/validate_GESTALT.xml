@@ -1,0 +1,172 @@
+<beast version='2.0'
+           namespace='beast.base.evolution.substitutionmodel.GeneralGestalt
+                        :beast.pkgmgmt
+                        :beast.base.core:beast.base.inference
+                        :beast.base.evolution.alignment
+                        :beast.base.evolution.tree.coalescent
+                        :beast.base.util
+                        :beast.base.math
+                        :beast.evolution.nuc
+                        :beast.base.evolution.operator
+                        :beast.base.inference.operator
+                        :beast.base.evolution.sitemodel
+                        :beast.base.evolution.substitutionmodel
+                        :beast.base.evolution.likelihood
+                        :gestalt.evolution.datatype.gestaltData'
+    >
+    <!-- dataType has to be set to gestaltData and the value must contain a ',' s.t. the class recognizes it as a comma separated string of integers-->
+        <data id="alignment" spec="feast.fileio.AlignmentFromNexus" name="alignment"
+              fileName="~/GABIanalysis/validation/data/simulate_GESTALT_all_trees.seed=$(seed).alignment.nexus">
+            <userDataType spec="gestalt.evolution.datatype.gestaltData"/>
+        </data>
+
+    <map name="Uniform" >beast.base.inference.distribution.Uniform</map>
+    <map name="Exponential" >beast.base.inference.distribution.Exponential</map>
+    <map name="LogNormal" >beast.base.inference.distribution.LogNormalDistributionModel</map>
+    <map name="Normal" >beast.base.inference.distribution.Normal</map>
+    <map name="Beta" >beast.base.inference.distribution.Beta</map>
+    <map name="Gamma" >beast.base.inference.distribution.Gamma</map>
+    <map name="LaplaceDistribution" >beast.base.inference.distribution.LaplaceDistribution</map>
+    <map name="prior" >beast.base.inference.distribution.Prior</map>
+    <map name="InverseGamma" >beast.base.inference.distribution.InverseGamma</map>
+    <map name="OneOnX" >beast.base.inference.distribution.OneOnX</map>
+
+
+    <!-- set all tip dates, time points of sampling to 25 time units -->
+    <traitSet id="dateTrait.t:alignment"
+              spec="beast.base.evolution.tree.TraitSet"
+              taxa="@TaxonSet.0"
+              traitname="date-forward"
+              value="0=25"
+    />
+
+    <run id="mcmc" spec="MCMC" chainLength="1000000">
+        <state id="state" spec="State" storeEvery="200">
+
+            <!-- fixed tree -->
+            <stateNode id="simulatedTree"
+                       spec="feast.fileio.TreeFromNewickFile"
+                       IsLabelledNewick='true'
+                       adjustTipHeights='false'
+                       fileName="~/GABIanalysis/validation/data/simulate_GESTALT_all_trees.seed=$(seed).newick"
+            />
+
+            <!-- parameters that affect the transition probabilities between target statuses-->
+             <parameter id="doubleCutWeight" spec="parameter.RealParameter" dimension="1" lower="0.0" name="stateNode" upper="Infinity"> 0.045 </parameter>
+             <parameter id="cutRates" spec="parameter.RealParameter" dimension="4" lower="0.0" name="stateNode" upper="Infinity"> 0.5 0.5 0.5 0.5 </parameter>
+             <parameter id="longTrimScaling" spec="parameter.RealParameter" dimension="2" lower="0.0" name="stateNode" upper="Infinity"> 0.1 0.1 </parameter>
+
+            <!-- parameters that control the probability of insert/deletion lengths -->
+            <parameter id="shortTrim" spec="parameter.RealParameter" dimension="2" lower="0.0" name="stateNode" upper="Infinity"> 0.4  1.0 -2.0 10.0 </parameter>
+            <parameter id="longTrim" spec="parameter.RealParameter" dimension="2" lower="0.0" name="stateNode" upper="Infinity"> 2.08453578  1.27399409 </parameter>
+
+             <parameter id="insert" spec="parameter.RealParameter" dimension="1" lower="0.0" name="stateNode" upper="Infinity">-0.37634279  1.65025805 </parameter>
+             <parameter id="trimZeroProbs" spec="parameter.RealParameter" dimension="5" lower="0.0" name="stateNode" upper="Infinity"> 0.0814752   0.09483087  0.51985543  0.30612402</parameter>
+
+
+            <!-- clock rate -->
+            <parameter id="clockRate"
+                       spec="parameter.RealParameter"
+                       dimension="1"
+                       lower="0.0"
+                       upper="Infinity"
+                       name="stateNode"
+            >0.00302
+            </parameter>
+
+            <parameter id="freqParameter.s:alignment"
+                       spec="parameter.RealParameter"
+                       dimension="4"
+                       lower="0.0"
+                       upper="1.0"
+                       name="stateNode"
+            >0.25
+            </parameter>
+
+         </state>
+
+
+        <distribution id="posterior" spec="beast.base.inference.CompoundDistribution">
+
+             <!-- priors -->
+            <distribution id="prior" spec="beast.base.inference.CompoundDistribution">
+
+                <prior id="CutRatesPrior" name="distribution" x="@cutRates">
+                    <LogNormal name="distr" M="0" S="0.2"/>
+                </prior>
+                <prior id="DoubleCutWeightPrior" name="distribution" x="@doubleCutWeight">
+                    <LogNormal name="distr" M="-3.1" S="0.2"/>
+                </prior>
+                <prior id="ClockPrior" name="distribution" x="@clockRate">
+                    <LogNormal name="distr" M="-4" S="0.2"/>
+                </prior>
+                <prior id="LongTrimFactorsPrior" name="distribution" x="@longTrimScaling">
+                    <Beta name="distr" alpha="5" beta="70"/>
+                </prior>
+            </distribution>
+
+         <!-- Tree likelihood -->
+            <distribution id="likelihood" spec="beast.base.inference.CompoundDistribution">
+                <distribution id="treeLikelihood.gestaltTest" spec="gestalt.evolution.likelihood.gestaltTreeLikelihood" data="@alignment" tree="@simulatedTree">
+                    <siteModel id="SiteModel.s:gestaltTest" spec="SiteModel">
+                        <parameter id="mutationRate.s:gestaltTest" spec="parameter.RealParameter" estimate="false" name="mutationRate">0.00</parameter>
+
+                        <parameter id="proportionInvariant.s:gestaltTest" spec="parameter.RealParameter" estimate="false" lower="0.0" name="proportionInvariant" upper="1.0">0.0</parameter>
+                        <substModel id="gestalt.s:gestaltTest" spec="gestalt.evolution.substitutionmodel.gestaltGeneral"
+                                    barcodeSequence="CG GATACGATACGCGCACGCTATGG AGTC GACACGACTCGCGCATACGATGG AGTC GATAGTATGCGTATACGCTATGG AGTC GATATGCATAGCGCATGCTATGG GAAAAAAAAAAAAAAA"
+                                    cutSite="6"
+                                    crucialPos="6 6"
+                                    maxSumSteps= "3000"
+                                    maxExtraSteps="1"
+
+                                    cutRates="@cutRates"
+                                    doubleCutWeight="@doubleCutWeight"
+                                    longTrimScalingFactors="@longTrimScaling"
+
+                                    insertZeroProb="0.6"
+                                    trimZeroProbs="@trimZeroProbs"
+                                    trimLongParams="@longTrim"
+                                    trimShortParams="@shortTrim"
+                                    insertParams="@insert"
+                                     >
+
+                            <frequencies id="freq" spec="beast.base.evolution.substitutionmodel.Frequencies" frequencies="1.0 0" estimate="false"/>
+                        </substModel>
+                    </siteModel>
+                    <branchRateModel id="StrictClock.c:gestaltTest" spec="beast.base.evolution.branchratemodel.StrictClockModel" clock.rate="@clockRate"/>
+                </distribution>
+            </distribution>
+        </distribution>
+
+
+        <!-- operators -->
+        <operator id="cutRatesScaler" spec="ScaleOperator" parameter="@cutRates" scaleFactor="0.8" weight="3.0"/>
+        <operator id="clockRateScaler" spec="ScaleOperator" parameter="@clockRate" scaleFactor="0.8" weight="3.0"/>
+        <operator id="longTrimScaler" spec="ScaleOperator" parameter="@longTrimScaling" scaleFactor="0.8" weight="3.0"/>
+        <operator id="doubleCutWeightScaler" spec="ScaleOperator" parameter="@doubleCutWeight" scaleFactor="0.8" weight="3.0"/>
+
+
+
+        <logger id="tracelog" spec="Logger" fileName="~/GABIanalysis/validation/log/$(filebase).$(seed).log" logEvery="1">
+            <log idref="posterior"/>
+            <log idref="likelihood"/>
+            <log idref="prior"/>
+            <log idref="treeLikelihood.gestaltTest"/>
+            <log id="treeHeight.t:gestaltTest" spec="beast.base.evolution.tree.TreeHeightLogger" tree="@simulatedTree"/>
+            <log idref="cutRates"/>
+            <log idref="clockRate"/>
+            <log idref="longTrimScaling"/>
+            <log idref="doubleCutWeight"/>
+        </logger>
+
+        <logger id="screenlog" spec="Logger" logEvery="200">
+            <log idref="posterior"/>
+            <log id="ESS.0" spec="util.ESS" arg="@posterior"/>
+            <log idref="likelihood"/>
+            <log idref="prior"/>
+        </logger>
+
+    </run>
+
+</beast>
+

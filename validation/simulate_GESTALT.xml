@@ -1,0 +1,134 @@
+<beast version="2.0"
+       namespace="beast.pkgmgmt:beast.base.core:beast.base.inference
+                 :beast.core.util
+                 :beast.core.parameter
+                 :beast.evolution.alignment
+                 :beast.evolution.likelihood
+                 :beast.evolution.tree
+                 :beast.evolution.tree.coalescent
+                 :beast.evolution.sitemodel
+                 :beast.evolution.substitutionmodel
+                 :beast.evolution.operators
+                 :beast.math.distributions
+                 :feast.simulation
+                 :gestalt.evolution
+                 :bdmmprime.distribution
+                 :bdmmprime.parameterization
+                 :bdmmprime.mapping">
+
+
+    <!-- target cut rates -->
+    <parameter id="cutRates"
+               spec="feast.fileio.RealParameterFromXSV"
+               name="stateNode"
+               fileName="~/GABIanalysis/validation/simulation_parameters/simcutRates.csv"
+               sep="," startRow="$(seed)" rowCount="1"
+               startCol="1" colCount="4" />
+
+    <!-- factor that scale how frequent long vs short cuts occur at the cut site  -->
+    <parameter id="longTrimScaling"
+               spec="feast.fileio.RealParameterFromXSV"
+               name="stateNode"
+               fileName="~/GABIanalysis/validation/simulation_parameters/simlongTrimScaling.csv"
+               sep="," startRow="$(seed)" rowCount="1"
+               startCol="1" colCount="2" />
+
+    <!-- factor that scale how frequent long vs short cuts occur at the cut site  -->
+    <parameter id="clockRate"
+               spec="feast.fileio.RealParameterFromXSV"
+               name="stateNode"
+               fileName="~/GABIanalysis/validation/simulation_parameters/simClockRates.csv"
+               sep="," startRow="$(seed)" rowCount="1"
+               startCol="1" colCount="1" />
+
+    <!-- double cut weight rate -->
+    <parameter id="doubleWeight"
+               spec="feast.fileio.RealParameterFromXSV"
+               name="stateNode"
+               fileName="~/GABIanalysis/validation/simulation_parameters/simDoubleWeights.csv"
+               sep="," startRow="$(seed)" rowCount="1"
+               startCol="1" colCount="1" />
+
+    <!-- length of simulation -->
+    <origin id="origin" spec="beast.base.inference.parameter.RealParameter" value="25"/>
+
+  <run spec="GPSimulator" nSims="1">
+
+    <!-- simulate sequence -->
+
+<!-- simulate tree -->
+      <simulationObject spec="bdmmprime.trajectories.simulation.SimulatedTree"
+                        id="simulatedTree" treeFileName="~/GABIanalysis/validation/data/$(filebase).seed=$(seed).newick"
+                        minSamples="1" simulateUntypedTree="True">
+
+          <parameterization spec="CanonicalParameterization">
+              <processLength idref="origin" />
+              <typeSet id="typeSet" spec="bdmmprime.parameterization.TypeSet" value="0"/>
+
+              <!-- Fix phylodynamic parameters -->
+              <birthRate spec="SkylineVectorParameter" typeSet="@typeSet">
+                  <skylineValues id="birthRate_ins" spec="beast.base.inference.parameter.RealParameter" value="0.8" />
+              </birthRate>
+
+              <deathRate spec="SkylineVectorParameter" typeSet="@typeSet">
+                  <skylineValues id="deathRate_ins" spec="beast.base.inference.parameter.RealParameter" value="0.2" />
+              </deathRate>
+
+              <!-- no sampling through time, only at present -->
+              <samplingRate spec="SkylineVectorParameter" typeSet="@typeSet">
+                  <skylineValues spec="beast.base.inference.parameter.RealParameter" value="0.0"/>
+              </samplingRate>
+
+              <rhoSampling spec="TimedParameter" typeSet="@typeSet"
+                           times="25" timesAreAges="False" values="0.00006"/>
+
+              <removalProb spec="SkylineVectorParameter" typeSet="@typeSet">
+                  <skylineValues spec="beast.base.inference.parameter.RealParameter" value="1.0"/>
+              </removalProb>
+
+          </parameterization>
+
+          <finalSampleOffset id="finalSampleOffset" spec="beast.base.inference.parameter.RealParameter" value="0"/> <!-- Will be set by simulation -->
+          <frequencies spec="beast.base.inference.parameter.RealParameter" value="1.0"/>
+      </simulationObject>
+
+
+
+
+      <simulationObject id="simulatedTreeNewick"
+                 spec="feast.fileio.TreeFromNewickFile"
+                 IsLabelledNewick='true' adjustTipHeights='false'
+                 fileName="~/GABIanalysis/validation/data/$(filebase).seed=$(seed).newick"/>
+
+      <simulationObject id="seqAlign" spec="gestalt.evolution.simulation.SimulatedGestaltAlignment"
+                        outputFileName="~/GABIanalysis/validation/data/$(filebase).seed=$(seed).alignment.nexus"
+                        tree="@simulatedTreeNewick">
+
+          <userDataType spec="gestalt.evolution.datatype.gestaltData"/>
+          <siteModel id="SiteModel.s:gestaltTest" spec="beast.base.evolution.sitemodel.SiteModel" mutationRate="@clockRate">
+              <parameter id="proportionInvariant.s:gestaltTest" spec="parameter.RealParameter" estimate="false" lower="0.0" name="proportionInvariant" upper="1.0">0.0</parameter>
+              <substModel id="gestalt.s:gestaltTest" spec="gestalt.evolution.substitutionmodel.gestaltGeneral"
+                          barcodeSequence="CG GATACGATACGCGCACGCTATGG AGTC GACACGACTCGCGCATACGATGG AGTC GATAGTATGCGTATACGCTATGG AGTC GATATGCATAGCGCATGCTATGG GAAAAAAAAAAAAAAA"
+                          cutSite="6"
+                          crucialPos="6 6"
+                          maxSumSteps= "3000"
+                          maxExtraSteps="1"
+                          cutRates="@cutRates"
+                          longTrimScalingFactors="@longTrimScaling"
+                          doubleCutWeight="@doubleWeight"
+              >
+                  <insertZeroProb id="insertzero" spec="parameter.RealParameter">0.6</insertZeroProb>
+                  <insertParams id="insertparams" spec="parameter.RealParameter" >-0.37634279  1.65025805</insertParams>
+                  <trimShortParams id="trimshort" spec="parameter.RealParameter" >0.4  1.0 -2.0 10.0</trimShortParams>
+                  <trimLongParams id="trimlong" spec="parameter.RealParameter" >2.08453578  1.27399409</trimLongParams>
+                  <trimZeroProbs id="trimzero" spec="parameter.RealParameter">0.0814752   0.09483087  0.51985543  0.30612402</trimZeroProbs>
+                  <frequencies id="freq" spec="beast.base.evolution.substitutionmodel.Frequencies" frequencies="1.0 0" estimate="false"/>
+              </substModel>
+          </siteModel>
+      </simulationObject>
+
+
+
+  </run>
+</beast>
+
